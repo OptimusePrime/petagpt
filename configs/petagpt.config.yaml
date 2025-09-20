@@ -1,0 +1,8 @@
+server:
+  port: 8000
+  host: "petagpt.petagimnazija.hr"
+  auto_tls: false
+document_parser:
+  service: "llama_index"
+  use_webhook: true
+  
