@@ -28,6 +28,8 @@ func InitConfig(cmd *cobra.Command) error {
 	defaultConfigDir := filepath.Join(home, "/.petagpt")
 	defaultConfigPath := filepath.Join(defaultConfigDir, "config.yaml")
 
+	viper.SetDefault("data_dir", defaultConfigDir)
+
 	viper.SetConfigType("yaml")
 	if len(defaultConfig) > 0 {
 		err := viper.ReadConfig(bytes.NewReader(defaultConfig))
@@ -55,7 +57,7 @@ func InitConfig(cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		
+
 		configFile, err := os.Create(defaultConfigPath)
 		if err != nil {
 			return err
@@ -64,7 +66,7 @@ func InitConfig(cmd *cobra.Command) error {
 			err = errors.Join(err, configFile.Close())
 		}()
 
-		_, err = configFile.Write(defaultConfig)
+		err = viper.WriteConfigAs(defaultConfigPath)
 		if err != nil {
 			return err
 		}

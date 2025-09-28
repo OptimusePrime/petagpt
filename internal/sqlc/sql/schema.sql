@@ -1,0 +1,45 @@
+-- noinspection SqlNoDataSourceInspectionForFile
+
+CREATE TABLE indexes (
+    id INTEGER PRIMARY KEY,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    name TEXT NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE documents (
+    id INTEGER PRIMARY KEY,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    filePath TEXT NOT NULL,
+    fileType VARCHAR(50) NOT NULL,
+    fileSize INTEGER NOT NULL
+);
+
+CREATE TABLE chunks (
+    id INTEGER PRIMARY KEY,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    start_offset INTEGER NOT NULL,
+    end_offset NOT NULL,
+    content TEXT,
+    context TEXT
+);
+
+CREATE TABLE conversations (
+    id INTEGER PRIMARY KEY,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE messages (
+    id INTEGER PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ipv4_addr VARCHAR(50) NOT NULL,
+    user_agent VARCHAR(255) NOT NULL,
+    content TEXT
+);

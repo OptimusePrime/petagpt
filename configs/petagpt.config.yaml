@@ -5,3 +5,18 @@ server:
 document_parser:
   service: "llama_index"
   use_webhook: true
+context_llm:
+  api_base: "https://api.openai.com/v1/",
+  api_key: "<YOUR_API_KEY>",
+  model: "gpt-5-mini",
+  prompt:
+    <document>
+    {{DOCUMENT}}
+    </document>
+    
+    <chunk>
+    {{CHUNK}}
+    </chunk>
+    
+    Please give a succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk for retrieval-augmented generation. 
+    Answer only with the context and nothing else.

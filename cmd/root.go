@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"os"
 
 	"github.com/OptimusePrime/petagpt/cmd/serve"
 	"github.com/OptimusePrime/petagpt/configs"
+	"github.com/OptimusePrime/petagpt/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -14,9 +16,20 @@ var (
 		Use:   "petagpt",
 		Short: "PetaGPT is an enterprise knowledgebase AI assistant",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return configs.InitConfig(cmd)
+			err := configs.InitConfig(cmd)
+			if err != nil {
+				return err
+			}
+
+			err = db.InitDatabase(context.Background())
+			if err != nil {
+				return err
+			}
+
+			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+
 			return nil
 		},
 	}
