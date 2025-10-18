@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 
+	"github.com/OptimusePrime/petagpt/cmd/document"
+	"github.com/OptimusePrime/petagpt/cmd/index"
 	"github.com/OptimusePrime/petagpt/cmd/serve"
 	"github.com/OptimusePrime/petagpt/configs"
 	"github.com/OptimusePrime/petagpt/internal/db"
@@ -48,4 +50,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&configs.CfgFile, "config", "", "config file (default is $HOME/.petagpt.yaml)")
 
 	rootCmd.AddCommand(serve.NewCommand())
+	rootCmd.AddCommand(index.NewCommand())
+	rootCmd.AddCommand(document.NewCommand())
 }

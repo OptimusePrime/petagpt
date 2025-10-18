@@ -2,9 +2,11 @@ package configs
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -14,6 +16,9 @@ import (
 
 //go:embed petagpt.config.yaml
 var defaultConfig []byte
+
+//go:embed spacy_worker.py
+var spacyWorkerScript []byte
 
 var CfgFile string
 
@@ -42,14 +47,14 @@ func InitConfig(cmd *cobra.Command) error {
 		viper.SetConfigFile(CfgFile)
 	} else {
 		viper.AddConfigPath(".")
-		viper.AddConfigPath(defaultConfigPath)
+		viper.AddConfigPath(defaultConfigDir)
 		viper.SetConfigName("config")
 	}
 
 	if err := viper.MergeInConfig(); err != nil {
 		var configFileNotFoundErr viper.ConfigFileNotFoundError
 
-		if !errors.As(err, &configFileNotFoundErr) {
+		if !errors.As(err, &configFileNotFoundErr) || err == nil {
 			return err
 		}
 
@@ -70,9 +75,64 @@ func InitConfig(cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
+
+		err = os.MkdirAll(filepath.Join(defaultConfigDir, "bin"), 0750)
+		if err != nil {
+			return err
+		}
+
+		spacyWorkerFile, err := os.Create(filepath.Join(defaultConfigDir, "bin/spacy_worker.py"))
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err = errors.Join(err, spacyWorkerFile.Close())
+		}()
+
+		_, err = spacyWorkerFile.Write(spacyWorkerScript)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = viper.BindPFlags(cmd.Flags())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetPythonPath() string {
+	venvDir := filepath.Join(viper.GetString("data_dir"), "bin/venv")
+	pythonPath := filepath.Join(venvDir, "bin/python3")
+
+	return pythonPath
+}
+
+func setupPythonEnv(ctx context.Context) error {
+	venvDir := filepath.Join(viper.GetString("data_dir"), "bin/venv")
+	pythonPath := filepath.Join(venvDir, "bin/python3")
+
+	_, err := os.Stat(venvDir)
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	createVenvCmd := exec.CommandContext(ctx, "python3", "-m", "venv", venvDir)
+	err = createVenvCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	installSpacyPreCmd := exec.CommandContext(ctx, pythonPath, "-m", "pip", "install", "setuptools", "wheel")
+	err = installSpacyPreCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	installSpacyCmd := exec.CommandContext(ctx, pythonPath, "-m", "pip", "install", "spacy")
+	err = installSpacyCmd.Run()
 	if err != nil {
 		return err
 	}

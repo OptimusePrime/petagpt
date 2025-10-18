@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	db "github.com/OptimusePrime/petagpt/internal/db"
@@ -39,34 +40,78 @@ type LlamaIndexJobStatusRequest struct {
 	JobID string `json:"job_id"`
 }
 
-func uploadChunkLlamaIndex(ctx context.Context, chunk []byte) (*LlamaIndexParsingStatusResponse, error) {
+const PARSING_PAGE_SEPARATOR = "\n@@RieSDIh6U5htthJY@@\n"
+
+func ParseDocument(ctx context.Context, document []byte, dc *DocumentChunker) error {
+	resp, err := uploadDocumentLlamaIndex(ctx, document)
+	if err != nil {
+		return err
+	}
+
+	status, err := waitJobDoneLlamaIndex(ctx, resp.ID)
+	if err != nil || status != STATUS_SUCCESS {
+		return fmt.Errorf("wait job failed: %w", err)
+	}
+
+	jobResult, err := getJobMarkdownResultLlamaIndex(resp.ID)
+	if err != nil {
+		return fmt.Errorf("markdown result failed: %w", err)
+	}
+
+	pages := strings.Split(jobResult.Markdown, PARSING_PAGE_SEPARATOR)
+
+	for _, page := range pages {
+		sentences, err := dc.SentenceSegmentText(ctx, page)
+		if err != nil {
+			return fmt.Errorf("segmentation failed: %w", err)
+		}
+		fmt.Println(sentences)
+	}
+
+	return nil
+}
+
+func uploadDocumentLlamaIndex(ctx context.Context, document []byte) (*LlamaIndexParsingStatusResponse, error) {
 	reqBody := new(bytes.Buffer)
 
 	multipartWriter := multipart.NewWriter(reqBody)
-	writer, err := multipartWriter.CreateFormFile("file", "")
+	err := multipartWriter.WriteField("page_separator", PARSING_PAGE_SEPARATOR)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create multipart form file for chunk: %w", err)
+		return nil, err
 	}
 
-	_, err = writer.Write(chunk)
+	writer, err := multipartWriter.CreateFormFile("file", "document.pdf")
 	if err != nil {
-		return nil, fmt.Errorf("failed to write chunk to multipart form file: %w", err)
+		return nil, fmt.Errorf("failed to create multipart form file for document: %w", err)
 	}
+
+	_, err = writer.Write(document)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write document to multipart form file: %w", err)
+	}
+	err = multipartWriter.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(reqBody.Len())
 
 	client := &http.Client{}
 
 	apiPath := LLAMA_INDEX_API_BASE + "/parsing/upload"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiPath, reqBody)
+	req, err := http.NewRequest(http.MethodPost, apiPath, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request for chunk parsing: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request for document parsing: %w", err)
 	}
-	req.Header.Set("Content-Type", "multipart/form-data")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", viper.Get("document_parser.api_key")))
+	fmt.Println(viper.GetString("document_parser.api_key"))
+	req.Header.Set("Content-Type", multipartWriter.FormDataContentType())
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", viper.GetString("document_parser.api_key")))
 
 	resp, err := client.Do(req)
+
 	if err != nil || resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to upload file for chunk parsing: %w", err)
+		return nil, fmt.Errorf("failed to upload file for document parsing: %w (%s)", err, resp.Status)
 	}
 	defer func() {
 		err = errors.Join(err, resp.Body.Close())
@@ -76,6 +121,7 @@ func uploadChunkLlamaIndex(ctx context.Context, chunk []byte) (*LlamaIndexParsin
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(string(respBytes))
 
 	parsingStatus := new(LlamaIndexParsingStatusResponse)
 	err = json.Unmarshal(respBytes, parsingStatus)
@@ -142,6 +188,8 @@ func waitJobDoneLlamaIndex(ctx context.Context, jobId string) (LlamaIndexParsing
 		if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
 			return status.Status, context.DeadlineExceeded
 		}
+
+		time.Sleep(3 * time.Second)
 	}
 }
 

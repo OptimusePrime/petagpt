@@ -6,9 +6,11 @@ document_parser:
   service: "llama_index"
   use_webhook: true
 context_llm:
-  api_base: "https://api.openai.com/v1/",
-  api_key: "<YOUR_API_KEY>",
-  model: "gpt-5-mini",
+  api_base: "https://api.openai.com/v1/"
+  api_key: "<YOUR_API_KEY>"
+  model: "gpt-5-mini"
+  temperature: 0.3
+  top_p: 0.95
   prompt:
     <document>
     {{DOCUMENT}}

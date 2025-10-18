@@ -183,11 +183,15 @@ func (q *Queries) DeleteMessage(ctx context.Context, id int64) error {
 }
 
 const getChunk = `-- name: GetChunk :one
+
 SELECT id, created_at, updated_at, document_id, start_offset, end_offset, content, context
 FROM chunks
 WHERE id = ? LIMIT 1
 `
 
+// ------
+// chunks
+// ------
 func (q *Queries) GetChunk(ctx context.Context, id int64) (Chunk, error) {
 	row := q.db.QueryRowContext(ctx, getChunk, id)
 	var i Chunk
@@ -205,11 +209,15 @@ func (q *Queries) GetChunk(ctx context.Context, id int64) (Chunk, error) {
 }
 
 const getConversation = `-- name: GetConversation :one
+
 SELECT id, created_at, updated_at
 FROM conversations
 WHERE id = ? LIMIT 1
 `
 
+// ------
+// conversations
+// ------
 func (q *Queries) GetConversation(ctx context.Context, id int64) (Conversation, error) {
 	row := q.db.QueryRowContext(ctx, getConversation, id)
 	var i Conversation
@@ -218,11 +226,15 @@ func (q *Queries) GetConversation(ctx context.Context, id int64) (Conversation, 
 }
 
 const getDocument = `-- name: GetDocument :one
+
 SELECT id, created_at, updated_at, filepath, filetype, filesize
 FROM documents
 WHERE id = ? LIMIT 1
 `
 
+// ------
+// documents
+// ------
 func (q *Queries) GetDocument(ctx context.Context, id int64) (Document, error) {
 	row := q.db.QueryRowContext(ctx, getDocument, id)
 	var i Document
@@ -238,11 +250,15 @@ func (q *Queries) GetDocument(ctx context.Context, id int64) (Document, error) {
 }
 
 const getIndex = `-- name: GetIndex :one
+
 SELECT id, created_at, updated_at, name, description
 FROM indexes
 WHERE id = ? LIMIT 1
 `
 
+// ------
+// indexes
+// ------
 func (q *Queries) GetIndex(ctx context.Context, id int64) (Index, error) {
 	row := q.db.QueryRowContext(ctx, getIndex, id)
 	var i Index
@@ -257,11 +273,15 @@ func (q *Queries) GetIndex(ctx context.Context, id int64) (Index, error) {
 }
 
 const getMessage = `-- name: GetMessage :one
+
 SELECT id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content
 FROM messages
 WHERE id = ? LIMIT 1
 `
 
+// ------
+// messages
+// ------
 func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
 	row := q.db.QueryRowContext(ctx, getMessage, id)
 	var i Message
