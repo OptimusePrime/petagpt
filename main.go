@@ -7,5 +7,6 @@ import (
 )
 
 func main() {
+	//index.TestBleve()
 	cmd.Execute()
 }
