@@ -7,6 +7,11 @@ SELECT *
 FROM indexes
 WHERE id = ? LIMIT 1;
 
+-- name: GetIndexByName :one
+SELECT *
+FROM indexes
+WHERE name = ? LIMIT 1;
+
 -- name: ListIndexes :many
 SELECT *
 FROM indexes
@@ -37,8 +42,8 @@ FROM documents
 ORDER BY created_at;
 
 -- name: CreateDocument :one
-INSERT INTO documents (filePath, fileType, fileSize)
-VALUES (?, ?, ?) RETURNING *;
+INSERT INTO documents (index_id, filePath, fileType, fileSize)
+VALUES (?, ?, ?, ?) RETURNING *;
 
 -- name: UpdateDocument :exec
 UPDATE documents SET filePath = ?, fileType = ?, fileSize = ? WHERE id = ?;

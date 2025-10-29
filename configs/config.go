@@ -93,6 +93,11 @@ func InitConfig(cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
+
+		err = setupPythonEnv(context.Background())
+		if err != nil {
+			return err
+		}
 	}
 
 	err = viper.BindPFlags(cmd.Flags())
@@ -133,6 +138,12 @@ func setupPythonEnv(ctx context.Context) error {
 
 	installSpacyCmd := exec.CommandContext(ctx, pythonPath, "-m", "pip", "install", "spacy")
 	err = installSpacyCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	downloadSpacyModelCmd := exec.CommandContext(ctx, pythonPath, "-m", "spacy", "download", "hr_core_news_lg")
+	err = downloadSpacyModelCmd.Run()
 	if err != nil {
 		return err
 	}

@@ -14,8 +14,8 @@ type Chunk struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DocumentID  int64
-	StartOffset int64
-	EndOffset   interface{}
+	StartOffset sql.NullInt64
+	EndOffset   sql.NullInt64
 	Content     sql.NullString
 	Context     sql.NullString
 }
@@ -30,6 +30,7 @@ type Document struct {
 	ID        int64
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	IndexID   int64
 	Filepath  string
 	Filetype  string
 	Filesize  int64
@@ -41,6 +42,7 @@ type Index struct {
 	UpdatedAt   time.Time
 	Name        string
 	Description sql.NullString
+	Path        string
 }
 
 type Message struct {

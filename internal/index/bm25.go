@@ -2,18 +2,11 @@ package index
 
 import (
 	"errors"
-	"fmt"
 	"log"
 
-	"github.com/OptimusePrime/petagpt/cmd/index"
-	bleve "github.com/blevesearch/bleve/v2"
+	"github.com/OptimusePrime/petagpt/internal/parser"
+	"github.com/blevesearch/bleve/v2"
 )
-
-type Document struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
 
 func CreateBleveIndex(indexPath string, defaultAnalyzer string) (bleve.Index, error) {
 	mapping := bleve.NewIndexMapping()
@@ -34,19 +27,19 @@ func CreateBleveIndex(indexPath string, defaultAnalyzer string) (bleve.Index, er
 	return index, nil
 }
 
-func AddDocumentsToBleveIndex(indexPath string, docs ...Document) error {
+func AddChunksToBleveIndex(indexPath string, docs ...parser.Chunk) error {
 	index, err := bleve.Open(indexPath)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		err = errors.Join(index.Close())
+		err = errors.Join(err, index.Close())
 	}()
 
 	batch := index.NewBatch()
 	for _, doc := range docs {
-		err = batch.Index(doc.ID, doc)
+		err = batch.Index(doc.SHA256(), doc)
 		if err != nil {
 			return err
 		}
@@ -58,19 +51,19 @@ func AddDocumentsToBleveIndex(indexPath string, docs ...Document) error {
 	return nil
 }
 
-func SearchBleveIndex(indexPath string, queryString string, field string, size int) (*bleve.SearchResult, error) {
+func SearchBleveIndex(indexPath string, queryString string, topN int) (*bleve.SearchResult, error) {
 	index, err := bleve.Open(indexPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer func() {
-		err = errors.Join(index.Close())
+		err = errors.Join(err, index.Close())
 	}()
 
-	query := bleve.NewMatchQuery("Bleve provides full-text search capabilities.")
+	query := bleve.NewMatchQuery(queryString)
 	query.SetField("content")
-	searchRequest := bleve.NewSearchRequestOptions(query, 5, 0, false)
+	searchRequest := bleve.NewSearchRequestOptions(query, max(topN, 100), 0, false)
 	searchRequest.Fields = []string{"title", "content"}
 	searchResult, err := index.Search(searchRequest)
 	if err != nil {
@@ -78,43 +71,4 @@ func SearchBleveIndex(indexPath string, queryString string, field string, size i
 	}
 
 	return searchResult, nil
-}
-
-func TestBleve() {
-	mapping := bleve.NewIndexMapping()
-	mapping.ScoringModel = "bm25"
-	mapping.TypeField = "type"
-	mapping.DefaultAnalyzer = "en"
-	index, err := bleve.New("bm25.bleve", mapping)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer index.Close()
-
-	documents := []Document{
-		{
-			ID:      "doc1",
-			Title:   "Bleve documentation",
-			Content: "Bleve provides full-text search capabilities.",
-		},
-		{
-			ID:      "doc2",
-			Title:   "Bleve documentation 2",
-			Content: "Bleve 2 provides full-text search capabilities.",
-		},
-		{
-			ID:      "doc3",
-			Title:   "Elasticsearch documentation",
-			Content: "Elasticsearch provides full-text search capabilities as well.",
-		},
-	}
-
-	batch := index.NewBatch()
-	for _, doc := range documents {
-		batch.Index(doc.ID, doc)
-	}
-	if err := index.Batch(batch); err != nil {
-		log.Fatal(err)
-	}
-
 }

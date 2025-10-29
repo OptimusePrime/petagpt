@@ -5,13 +5,15 @@ CREATE TABLE indexes (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     name TEXT UNIQUE NOT NULL,
-    description TEXT
+    description TEXT,
+    path TEXT NOT NULL
 );
 
 CREATE TABLE documents (
     id INTEGER PRIMARY KEY,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    index_id INTEGER NOT NULL REFERENCES indexes(id) ON DELETE CASCADE,
     filePath TEXT NOT NULL,
     fileType VARCHAR(50) NOT NULL,
     fileSize INTEGER NOT NULL
@@ -22,8 +24,8 @@ CREATE TABLE chunks (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    start_offset INTEGER NOT NULL,
-    end_offset NOT NULL,
+    start_offset INTEGER,
+    end_offset INTEGER,
     content TEXT,
     context TEXT
 );

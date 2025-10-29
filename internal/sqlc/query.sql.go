@@ -18,8 +18,8 @@ VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at, document_id, start_
 
 type CreateChunkParams struct {
 	DocumentID  int64
-	StartOffset int64
-	EndOffset   interface{}
+	StartOffset sql.NullInt64
+	EndOffset   sql.NullInt64
 	Content     sql.NullString
 	Context     sql.NullString
 }
@@ -58,23 +58,30 @@ func (q *Queries) CreateConversation(ctx context.Context) (Conversation, error) 
 }
 
 const createDocument = `-- name: CreateDocument :one
-INSERT INTO documents (filePath, fileType, fileSize)
-VALUES (?, ?, ?) RETURNING id, created_at, updated_at, filepath, filetype, filesize
+INSERT INTO documents (index_id, filePath, fileType, fileSize)
+VALUES (?, ?, ?, ?) RETURNING id, created_at, updated_at, index_id, filepath, filetype, filesize
 `
 
 type CreateDocumentParams struct {
+	IndexID  int64
 	Filepath string
 	Filetype string
 	Filesize int64
 }
 
 func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) (Document, error) {
-	row := q.db.QueryRowContext(ctx, createDocument, arg.Filepath, arg.Filetype, arg.Filesize)
+	row := q.db.QueryRowContext(ctx, createDocument,
+		arg.IndexID,
+		arg.Filepath,
+		arg.Filetype,
+		arg.Filesize,
+	)
 	var i Document
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IndexID,
 		&i.Filepath,
 		&i.Filetype,
 		&i.Filesize,
@@ -84,7 +91,7 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 
 const createIndex = `-- name: CreateIndex :one
 INSERT INTO indexes (name, description)
-VALUES (?, ?) RETURNING id, created_at, updated_at, name, description
+VALUES (?, ?) RETURNING id, created_at, updated_at, name, description, path
 `
 
 type CreateIndexParams struct {
@@ -101,6 +108,7 @@ func (q *Queries) CreateIndex(ctx context.Context, arg CreateIndexParams) (Index
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		&i.Path,
 	)
 	return i, err
 }
@@ -227,7 +235,7 @@ func (q *Queries) GetConversation(ctx context.Context, id int64) (Conversation, 
 
 const getDocument = `-- name: GetDocument :one
 
-SELECT id, created_at, updated_at, filepath, filetype, filesize
+SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize
 FROM documents
 WHERE id = ? LIMIT 1
 `
@@ -242,6 +250,7 @@ func (q *Queries) GetDocument(ctx context.Context, id int64) (Document, error) {
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IndexID,
 		&i.Filepath,
 		&i.Filetype,
 		&i.Filesize,
@@ -251,7 +260,7 @@ func (q *Queries) GetDocument(ctx context.Context, id int64) (Document, error) {
 
 const getIndex = `-- name: GetIndex :one
 
-SELECT id, created_at, updated_at, name, description
+SELECT id, created_at, updated_at, name, description, path
 FROM indexes
 WHERE id = ? LIMIT 1
 `
@@ -268,6 +277,27 @@ func (q *Queries) GetIndex(ctx context.Context, id int64) (Index, error) {
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		&i.Path,
+	)
+	return i, err
+}
+
+const getIndexByName = `-- name: GetIndexByName :one
+SELECT id, created_at, updated_at, name, description, path
+FROM indexes
+WHERE name = ? LIMIT 1
+`
+
+func (q *Queries) GetIndexByName(ctx context.Context, name string) (Index, error) {
+	row := q.db.QueryRowContext(ctx, getIndexByName, name)
+	var i Index
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Description,
+		&i.Path,
 	)
 	return i, err
 }
@@ -365,7 +395,7 @@ func (q *Queries) ListConversations(ctx context.Context) ([]Conversation, error)
 }
 
 const listDocuments = `-- name: ListDocuments :many
-SELECT id, created_at, updated_at, filepath, filetype, filesize
+SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize
 FROM documents
 ORDER BY created_at
 `
@@ -383,6 +413,7 @@ func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IndexID,
 			&i.Filepath,
 			&i.Filetype,
 			&i.Filesize,
@@ -401,7 +432,7 @@ func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
 }
 
 const listIndexes = `-- name: ListIndexes :many
-SELECT id, created_at, updated_at, name, description
+SELECT id, created_at, updated_at, name, description, path
 FROM indexes
 ORDER BY name
 `
@@ -421,6 +452,7 @@ func (q *Queries) ListIndexes(ctx context.Context) ([]Index, error) {
 			&i.UpdatedAt,
 			&i.Name,
 			&i.Description,
+			&i.Path,
 		); err != nil {
 			return nil, err
 		}
@@ -478,8 +510,8 @@ UPDATE chunks SET document_id = ?, start_offset = ?, end_offset = ?, content = ?
 
 type UpdateChunkParams struct {
 	DocumentID  int64
-	StartOffset int64
-	EndOffset   interface{}
+	StartOffset sql.NullInt64
+	EndOffset   sql.NullInt64
 	Content     sql.NullString
 	Context     sql.NullString
 	ID          int64

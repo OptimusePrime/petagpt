@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/openai/openai-go/v2"
@@ -9,18 +10,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-func CreateChunkContext(ctx context.Context, documentContent string, chunkContent string) (error, string) {
+func TransformTable(ctx context.Context, tableContent string) (string, error) {
 	client := openai.NewClient(
 		option.WithAPIKey(viper.GetString("context_llm.api_key")),
 		option.WithBaseURL(viper.GetString("context_llm.api_base")),
 	)
 
 	r := strings.NewReplacer(
-		"{{DOCUMENT}}", documentContent,
-		"{{CHUNK}}", chunkContent,
-	)
+		"{{TABLE}}", tableContent)
 
-	replacedPrompt := r.Replace(viper.GetString("context_llm.prompt"))
+	replacedPrompt := r.Replace(viper.GetString("context_llm.table_prompt"))
 
 	chatCompl, err := client.Chat.Completions.New(
 		ctx, openai.ChatCompletionNewParams{
@@ -33,10 +32,43 @@ func CreateChunkContext(ctx context.Context, documentContent string, chunkConten
 		},
 	)
 	if err != nil {
-		return err, ""
+		return "", fmt.Errorf("failed to transform table: %w", err)
+	}
+
+	table := chatCompl.Choices[0].Message.Content
+
+	return table, nil
+}
+
+func CreateChunkContext(ctx context.Context, documentContent string, chunkContent string) (string, error) {
+	client := openai.NewClient(
+		option.WithAPIKey(viper.GetString("context_llm.api_key")),
+		option.WithBaseURL(viper.GetString("context_llm.api_base")),
+	)
+
+	r := strings.NewReplacer(
+		"{{DOCUMENT}}", documentContent,
+		"{{CHUNK}}", chunkContent,
+	)
+
+	replacedPrompt := r.Replace(viper.GetString("context_llm.contextualize_prompt"))
+
+	chatCompl, err := client.Chat.Completions.New(
+		ctx, openai.ChatCompletionNewParams{
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.UserMessage(replacedPrompt),
+			},
+			Model:       viper.GetString("context_llm.model"),
+			Temperature: openai.Float(viper.GetFloat64("context_llm.temperature")),
+			TopP:        openai.Float(viper.GetFloat64("context_llm.top_p")),
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to create chunk context: %w", err)
 	}
 
 	chunkContext := chatCompl.Choices[0].Message.Content
 
-	return nil, chunkContext
+	return chunkContext, nil
 }

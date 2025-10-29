@@ -9,7 +9,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"strings"
 	"time"
 
 	db "github.com/OptimusePrime/petagpt/internal/db"
@@ -42,45 +41,58 @@ type LlamaIndexJobStatusRequest struct {
 
 const PARSING_PAGE_SEPARATOR = "\n@@RieSDIh6U5htthJY@@\n"
 
-func ParseDocument(ctx context.Context, document []byte, dc *DocumentChunker) error {
-	resp, err := uploadDocumentLlamaIndex(ctx, document)
-	if err != nil {
-		return err
-	}
-
-	status, err := waitJobDoneLlamaIndex(ctx, resp.ID)
-	if err != nil || status != STATUS_SUCCESS {
-		return fmt.Errorf("wait job failed: %w", err)
-	}
-
-	jobResult, err := getJobMarkdownResultLlamaIndex(resp.ID)
-	if err != nil {
-		return fmt.Errorf("markdown result failed: %w", err)
-	}
-
-	pages := strings.Split(jobResult.Markdown, PARSING_PAGE_SEPARATOR)
-
-	for _, page := range pages {
-		sentences, err := dc.SentenceSegmentText(ctx, page)
-		if err != nil {
-			return fmt.Errorf("segmentation failed: %w", err)
-		}
-		fmt.Println(sentences)
-	}
-
-	return nil
-}
-
-func uploadDocumentLlamaIndex(ctx context.Context, document []byte) (*LlamaIndexParsingStatusResponse, error) {
-	reqBody := new(bytes.Buffer)
-
-	multipartWriter := multipart.NewWriter(reqBody)
-	err := multipartWriter.WriteField("page_separator", PARSING_PAGE_SEPARATOR)
+func ProcessDocument(ctx context.Context, document []byte, fileName string, dc *DocumentChunker, chunkSize int) ([]Chunk, error) {
+	doc, err := parseDocument(ctx, document, fileName)
 	if err != nil {
 		return nil, err
 	}
 
-	writer, err := multipartWriter.CreateFormFile("file", "document.pdf")
+	chunks, err := dc.Chunk(ctx, doc, chunkSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return chunks, nil
+}
+
+func parseDocument(ctx context.Context, document []byte, fileName string) (string, error) {
+	resp, err := uploadDocumentLlamaIndex(ctx, document, fileName)
+	if err != nil {
+		return "", err
+	}
+
+	status, err := waitJobDoneLlamaIndex(ctx, resp.ID)
+	if err != nil || status != STATUS_SUCCESS {
+		return "", fmt.Errorf("wait job failed: %w", err)
+	}
+
+	jobResult, err := getJobMarkdownResultLlamaIndex(resp.ID)
+	if err != nil {
+		return "", fmt.Errorf("markdown result failed: %w", err)
+	}
+
+	return jobResult.Markdown, nil
+}
+
+func uploadDocumentLlamaIndex(ctx context.Context, document []byte, fileName string) (*LlamaIndexParsingStatusResponse, error) {
+	reqBody := new(bytes.Buffer)
+
+	multipartWriter := multipart.NewWriter(reqBody)
+
+	fields := map[string]string{
+		"page_separator":                        PARSING_PAGE_SEPARATOR,
+		"output_tables_as_HTML":                 "true",
+		"merge_tables_across_pages_in_markdown": "true",
+	}
+
+	for field, value := range fields {
+		err := multipartWriter.WriteField(field, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	writer, err := multipartWriter.CreateFormFile("file", fileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multipart form file for document: %w", err)
 	}
@@ -100,7 +112,7 @@ func uploadDocumentLlamaIndex(ctx context.Context, document []byte) (*LlamaIndex
 
 	apiPath := LLAMA_INDEX_API_BASE + "/parsing/upload"
 
-	req, err := http.NewRequest(http.MethodPost, apiPath, reqBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiPath, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request for document parsing: %w", err)
 	}

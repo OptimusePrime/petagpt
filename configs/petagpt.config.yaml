@@ -11,7 +11,8 @@ context_llm:
   model: "gpt-5-mini"
   temperature: 0.3
   top_p: 0.95
-  prompt:
+  max_concurrent_requests: 20
+  contextualize_prompt:
     <document>
     {{DOCUMENT}}
     </document>
@@ -22,3 +23,16 @@ context_llm:
     
     Please give a succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk for retrieval-augmented generation. 
     Answer only with the context and nothing else.
+  table_prompt:
+    <table>
+    {{TABLE}}
+    </table>
+    
+    Transform the table into an article format with full sentences, as easy to understand as possible, for easy understanding by LLMs and embedding models. Make sure to preserve all meaning. It should be in the language of the table.
+embedding_service:
+  base_url: "http://localhost:3000"
+  api_key: "<YOUR_API_KEY>"
+  model: "Qwen3-Embedding-8B"
+chroma:
+  base_url: "http://localhost:8001"
+  
