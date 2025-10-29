@@ -35,4 +35,12 @@ embedding_service:
   model: "Qwen3-Embedding-8B"
 chroma:
   base_url: "http://localhost:8001"
-  
+main_llm:
+  system_prompt:
+    Hi
+  api_base: "https://api.openai.com/v1/"
+  api_key: "<YOUR_API_KEY>"
+  model: "gpt-5-mini"
+  temperature: 0.3
+  top_p: 0.95
+  max_concurrent_requests: 20
