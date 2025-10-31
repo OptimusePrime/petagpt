@@ -18,7 +18,7 @@ func InitDatabase(ctx context.Context) error {
 	configDir := viper.GetString("data_dir")
 
 	dbPath := filepath.Join(configDir, "storage.sqlite")
-	
+
 	var err error
 	MainDB, err = sql.Open("sqlite3", dbPath)
 	if err != nil {

@@ -16,26 +16,29 @@ import (
 
 var numWorkers int
 var chunkSize int
+var idxName string
 
 var documentAddCommand = &cobra.Command{
 	Use:   "add",
 	Short: "Add new document(s) to a document index",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf("you must provide at least one document path")
+		}
+
 		dc, err := parser.NewDocumentChunker(cmd.Context(), numWorkers)
 		if err != nil {
 			return fmt.Errorf("failed to create a document chunker: %w", err)
 		}
 
-		indexName := args[0]
-
 		queries := sqlc.New(db.MainDB)
 
-		idx, err := queries.GetIndexByName(cmd.Context(), indexName)
+		idx, err := queries.GetIndexByName(cmd.Context(), idxName)
 		if err != nil {
 			return fmt.Errorf("failed to find idx: %w", err)
 		}
 
-		for _, docPath := range args[1:] {
+		for _, docPath := range args {
 			doc, err := os.Open(docPath)
 			if err != nil {
 				return fmt.Errorf("failed to open document: %s: %w", docPath, err)
@@ -86,9 +89,9 @@ var documentAddCommand = &cobra.Command{
 				return fmt.Errorf("failed adding chunks to BM25 index: %s: %w", idx.Path, err)
 			}
 
-			err = index.AddChunksToChromaCollection(cmd.Context(), indexName, chunks...)
+			err = index.AddChunksToChromaCollection(cmd.Context(), idxName, chunks...)
 			if err != nil {
-				return fmt.Errorf("failed adding chunks to Chroma collection: %s: %w", indexName, err)
+				return fmt.Errorf("failed adding chunks to Chroma collection: %s: %w", idxName, err)
 			}
 		}
 
@@ -128,6 +131,7 @@ var documentAddCommand = &cobra.Command{
 func newDocumentAddCmd() *cobra.Command {
 	documentAddCommand.Flags().IntVarP(&numWorkers, "num_workers", "w", 4, "Specify the number of workers for sentence segmentation")
 	documentAddCommand.Flags().IntVarP(&chunkSize, "chunk_size", "c", 50, "Size of the chunks in number of sentences")
+	documentAddCommand.Flags().StringVarP(&idxName, "index", "i", "", "The name of the index to add the document to")
 
 	return documentAddCommand
 }

@@ -8,8 +8,6 @@ import (
 
 	"github.com/OptimusePrime/petagpt/internal/parser"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"golang.org/x/sync/semaphore"
 )
 
 var serveCmd = &cobra.Command{
@@ -18,7 +16,7 @@ var serveCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		sem := semaphore.NewWeighted(viper.GetInt64("context_llm.max_concurrent_requests"))
+		//sem := semaphore.NewWeighted(viper.GetInt64("context_llm.max_concurrent_requests"))
 		chunker, err := parser.NewDocumentChunker(cmd.Context(), 8)
 		if err != nil {
 			return err

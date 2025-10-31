@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/OptimusePrime/petagpt/internal/index"
 	"github.com/OptimusePrime/petagpt/internal/sqlc"
 	"github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var name string
@@ -30,6 +32,7 @@ var indexAddCommand = &cobra.Command{
 				String: description,
 				Valid:  true,
 			},
+			Path: filepath.Join(viper.GetString("data_dir"), "bm25", fmt.Sprintf("%s.bleve", name)),
 		})
 		if err != nil {
 			if errors.Is(err, sqlite3.ErrConstraintUnique) {

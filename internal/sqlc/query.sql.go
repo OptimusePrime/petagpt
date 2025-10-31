@@ -90,17 +90,18 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 }
 
 const createIndex = `-- name: CreateIndex :one
-INSERT INTO indexes (name, description)
-VALUES (?, ?) RETURNING id, created_at, updated_at, name, description, path
+INSERT INTO indexes (name, description, path)
+VALUES (?, ?, ?) RETURNING id, created_at, updated_at, name, description, path
 `
 
 type CreateIndexParams struct {
 	Name        string
 	Description sql.NullString
+	Path        string
 }
 
 func (q *Queries) CreateIndex(ctx context.Context, arg CreateIndexParams) (Index, error) {
-	row := q.db.QueryRowContext(ctx, createIndex, arg.Name, arg.Description)
+	row := q.db.QueryRowContext(ctx, createIndex, arg.Name, arg.Description, arg.Path)
 	var i Index
 	err := row.Scan(
 		&i.ID,

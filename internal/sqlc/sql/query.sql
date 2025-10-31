@@ -18,8 +18,8 @@ FROM indexes
 ORDER BY name;
 
 -- name: CreateIndex :one
-INSERT INTO indexes (name, description)
-VALUES (?, ?) RETURNING *;
+INSERT INTO indexes (name, description, path)
+VALUES (?, ?, ?) RETURNING *;
 
 -- name: UpdateIndex :exec
 UPDATE indexes SET name = ?, description = ? WHERE id = ?;
