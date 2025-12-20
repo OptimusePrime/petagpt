@@ -41,13 +41,13 @@ type LlamaIndexJobStatusRequest struct {
 
 const PARSING_PAGE_SEPARATOR = "\n@@RieSDIh6U5htthJY@@\n"
 
-func ProcessDocument(ctx context.Context, document []byte, fileName string, dc *DocumentChunker, chunkSize int) ([]Chunk, error) {
+func ProcessDocument(ctx context.Context, document []byte, fileName string, dc *DocumentChunker, chunkSize int, requestDelay int) ([]Chunk, error) {
 	doc, err := parseDocument(ctx, document, fileName)
 	if err != nil {
 		return nil, err
 	}
 
-	chunks, err := dc.Chunk(ctx, doc, chunkSize)
+	chunks, err := dc.Chunk(ctx, doc, chunkSize, requestDelay)
 	if err != nil {
 		return nil, err
 	}

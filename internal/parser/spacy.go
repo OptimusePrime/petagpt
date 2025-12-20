@@ -17,11 +17,13 @@ import (
 	"time"
 
 	"github.com/OptimusePrime/petagpt/configs"
+	"github.com/OptimusePrime/petagpt/internal/crypto_utils"
 	"github.com/spf13/viper"
 	"golang.org/x/sync/semaphore"
 )
 
 type Chunk struct {
+	ID      string
 	Content string
 	Context string
 }
@@ -32,7 +34,7 @@ func (c Chunk) String() string {
 
 func (c Chunk) SHA256() string {
 	sha := sha256.Sum256([]byte(c.String()))
-	
+
 	return base64.StdEncoding.EncodeToString(sha[:])
 }
 
@@ -165,13 +167,15 @@ func (w *SpacyWorker) Shutdown() error {
 }
 
 type DocumentChunker struct {
-	workers []*SpacyWorker
-	sem     *semaphore.Weighted
+	workers    []*SpacyWorker
+	workersSem *semaphore.Weighted
+	llmSem     *semaphore.Weighted
 }
 
-func NewDocumentChunker(ctx context.Context, numWorkers int) (*DocumentChunker, error) {
+func NewDocumentChunker(ctx context.Context, numWorkers int, maxConcurrentRequests int) (*DocumentChunker, error) {
 	chunker := new(DocumentChunker)
-	chunker.sem = semaphore.NewWeighted(int64(numWorkers))
+	chunker.workersSem = semaphore.NewWeighted(int64(numWorkers))
+	chunker.llmSem = semaphore.NewWeighted(int64(maxConcurrentRequests))
 
 	for range numWorkers {
 		w, err := StartSpacyWorker(ctx, configs.GetPythonPath())
@@ -214,7 +218,7 @@ func (dc *DocumentChunker) sentenceSegmentText(ctx context.Context, text string)
 	return resp.Sentences, nil
 }
 
-func (dc *DocumentChunker) extractTablesFromDocument(ctx context.Context, parsedDocument string) ([]string, error) {
+func (dc *DocumentChunker) extractTablesFromDocument(ctx context.Context, parsedDocument string, requestDelay int) ([]string, error) {
 	tableRegexStr := "<table>.*?<\\/table>"
 	tableRegex, err := regexp.Compile(tableRegexStr)
 	if err != nil {
@@ -227,13 +231,13 @@ func (dc *DocumentChunker) extractTablesFromDocument(ctx context.Context, parsed
 	errCh := make(chan error, len(tables))
 
 	for _, table := range tables {
-		err = dc.sem.Acquire(ctx, 1)
+		err = dc.llmSem.Acquire(ctx, 1)
 		if err != nil {
 			return nil, err
 		}
 
 		go func() {
-			defer dc.sem.Release(1)
+			defer dc.llmSem.Release(1)
 
 			tableSummary, err := TransformTable(ctx, table)
 			if err != nil {
@@ -242,6 +246,7 @@ func (dc *DocumentChunker) extractTablesFromDocument(ctx context.Context, parsed
 
 			ch <- tableSummary
 		}()
+		//time.Sleep(5000 * time.Millisecond)
 	}
 
 	var tableSummaries []string
@@ -258,10 +263,10 @@ func (dc *DocumentChunker) extractTablesFromDocument(ctx context.Context, parsed
 	return tableSummaries, nil
 }
 
-func (dc *DocumentChunker) Chunk(ctx context.Context, document string, chunkSize int) ([]Chunk, error) {
+func (dc *DocumentChunker) Chunk(ctx context.Context, document string, chunkSize int, requestDelay int) ([]Chunk, error) {
 	var chunkContents []string
 
-	tableSummaries, err := dc.extractTablesFromDocument(ctx, document)
+	tableSummaries, err := dc.extractTablesFromDocument(ctx, document, requestDelay)
 	if err != nil {
 		return nil, err
 	}
@@ -308,21 +313,29 @@ func (dc *DocumentChunker) Chunk(ctx context.Context, document string, chunkSize
 	ch := make(chan Chunk, len(chunkContents))
 	errCh := make(chan error, len(chunkContents))
 
-	for _, content := range chunkContents {
-		if err = dc.sem.Acquire(ctx, 1); err != nil {
+	for i, content := range chunkContents {
+		if err = dc.llmSem.Acquire(ctx, 1); err != nil {
 			return nil, err
 		}
 
 		go func() {
-			defer dc.sem.Release(1)
+			defer dc.llmSem.Release(1)
 
 			chunkContext, err := CreateChunkContext(ctx, document, content)
 			if err != nil {
-				errCh <- err
+				errCh <- fmt.Errorf("failed creating chunk context: %x: %w", i, err)
 				return
 			}
 
+			chunkID, err := crypto_utils.RandomBytes(16)
+			if err != nil {
+				errCh <- fmt.Errorf("failed generating chunk ID: %x: %w", i, err)
+				return
+			}
+			chunkIDBase64 := base64.StdEncoding.EncodeToString(chunkID)
+
 			chunk := Chunk{
+				ID:      chunkIDBase64,
 				Content: content,
 				Context: chunkContext,
 			}

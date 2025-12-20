@@ -12,6 +12,7 @@ var documentCmd = &cobra.Command{
 
 func NewCommand() *cobra.Command {
 	documentCmd.AddCommand(newDocumentAddCmd())
+	documentCmd.AddCommand(newDocumentRemoveCmd())
 
 	return documentCmd
 }

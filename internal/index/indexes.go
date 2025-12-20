@@ -33,7 +33,17 @@ func CreateIndex(ctx context.Context, params sqlc.CreateIndexParams) error {
 
 	_, err := queries.CreateIndex(ctx, params)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating index entry in DB: %w", err)
+	}
+
+	_, err = CreateBleveIndex(params.Path, "en")
+	if err != nil {
+		return fmt.Errorf("failed creating Bleve index: %w", err)
+	}
+
+	err = CreateChromaCollection(ctx, params.Name)
+	if err != nil {
+		return fmt.Errorf("failed creating Chroma collection: %w", err)
 	}
 
 	return nil

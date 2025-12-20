@@ -14,39 +14,41 @@ import (
 	"github.com/spf13/viper"
 )
 
-var name string
-var description string
+func newIndexAddCommand() *cobra.Command {
+	var (
+		name,
+		description string
+	)
 
-var indexAddCommand = &cobra.Command{
-	Use:   "add",
-	Short: "Create a new document index",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	indexAddCommand := &cobra.Command{
+		Use:   "add",
+		Short: "Create a new document index",
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		if len(strings.TrimSpace(name)) == 0 {
-			return fmt.Errorf("you must provide a name for the index")
-		}
-
-		err := index.CreateIndex(cmd.Context(), sqlc.CreateIndexParams{
-			Name: name,
-			Description: sql.NullString{
-				String: description,
-				Valid:  true,
-			},
-			Path: filepath.Join(viper.GetString("data_dir"), "bm25", fmt.Sprintf("%s.bleve", name)),
-		})
-		if err != nil {
-			if errors.Is(err, sqlite3.ErrConstraintUnique) {
-				return fmt.Errorf("index names must be unique: %w", err)
+			if len(strings.TrimSpace(name)) == 0 {
+				return fmt.Errorf("you must provide a name for the index")
 			}
 
-			return fmt.Errorf("failed to create new index: %w", err)
-		}
+			err := index.CreateIndex(cmd.Context(), sqlc.CreateIndexParams{
+				Name: name,
+				Description: sql.NullString{
+					String: description,
+					Valid:  true,
+				},
+				Path: filepath.Join(viper.GetString("data_dir"), "bm25", fmt.Sprintf("%s.bleve", name)),
+			})
+			if err != nil {
+				if errors.Is(err, sqlite3.ErrConstraintUnique) {
+					return fmt.Errorf("index names must be unique: %w", err)
+				}
 
-		return nil
-	},
-}
+				return fmt.Errorf("failed to create new index: %w", err)
+			}
 
-func newIndexAddCommand() *cobra.Command {
+			return nil
+		},
+	}
+
 	indexAddCommand.Flags().StringVarP(&name, "name", "n", "", "The name of the index, must be unique")
 	indexAddCommand.Flags().StringVarP(&description, "description", "d", "", "The description of the index")
 

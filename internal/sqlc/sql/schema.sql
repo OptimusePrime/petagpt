@@ -13,35 +13,39 @@ CREATE TABLE documents (
     id INTEGER PRIMARY KEY,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    index_id INTEGER NOT NULL REFERENCES indexes(id) ON DELETE CASCADE,
+    index_id INTEGER NOT NULL REFERENCES indexes (id) ON DELETE CASCADE,
     filePath TEXT NOT NULL,
     fileType VARCHAR(50) NOT NULL,
-    fileSize INTEGER NOT NULL
+    fileSize INTEGER NOT NULL,
+    fileSha256 VARCHAR(50) NOT NULL
 );
 
 CREATE TABLE chunks (
     id INTEGER PRIMARY KEY,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    document_id INTEGER NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
     start_offset INTEGER,
     end_offset INTEGER,
-    content TEXT,
-    context TEXT
+    content TEXT NOT NULL,
+    context TEXT NOT NULL,
+    indexing_id TEXT NOT NULL
 );
 
 CREATE TABLE conversations (
     id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE messages (
     id INTEGER PRIMARY KEY,
-    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id TEXT NOT NULL REFERENCES conversations (session_id) ON DELETE CASCADE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ipv4_addr VARCHAR(50) NOT NULL,
-    user_agent VARCHAR(255) NOT NULL,
-    content TEXT
+    ipv4_addr VARCHAR(50),
+    user_agent VARCHAR(255),
+    content TEXT NOT NULL,
+    role VARCHAR(50) NOT NULL
 );

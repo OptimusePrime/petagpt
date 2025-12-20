@@ -16,24 +16,27 @@ type Chunk struct {
 	DocumentID  int64
 	StartOffset sql.NullInt64
 	EndOffset   sql.NullInt64
-	Content     sql.NullString
-	Context     sql.NullString
+	Content     string
+	Context     string
+	IndexingID  string
 }
 
 type Conversation struct {
 	ID        int64
+	SessionID string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 type Document struct {
-	ID        int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	IndexID   int64
-	Filepath  string
-	Filetype  string
-	Filesize  int64
+	ID         int64
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	IndexID    int64
+	Filepath   string
+	Filetype   string
+	Filesize   int64
+	Filesha256 string
 }
 
 type Index struct {
@@ -47,10 +50,11 @@ type Index struct {
 
 type Message struct {
 	ID             int64
-	ConversationID int64
+	ConversationID string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
-	Ipv4Addr       string
-	UserAgent      string
-	Content        sql.NullString
+	Ipv4Addr       sql.NullString
+	UserAgent      sql.NullString
+	Content        string
+	Role           string
 }

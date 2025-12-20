@@ -12,16 +12,25 @@ import (
 )
 
 const createChunk = `-- name: CreateChunk :one
-INSERT INTO chunks (document_id, start_offset, end_offset, content, context)
-VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at, document_id, start_offset, end_offset, content, context
+INSERT INTO
+    chunks (
+        document_id,
+        start_offset,
+        end_offset,
+        content,
+        context,
+        indexing_id
+    )
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at, document_id, start_offset, end_offset, content, context, indexing_id
 `
 
 type CreateChunkParams struct {
 	DocumentID  int64
 	StartOffset sql.NullInt64
 	EndOffset   sql.NullInt64
-	Content     sql.NullString
-	Context     sql.NullString
+	Content     string
+	Context     string
+	IndexingID  string
 }
 
 func (q *Queries) CreateChunk(ctx context.Context, arg CreateChunkParams) (Chunk, error) {
@@ -31,6 +40,7 @@ func (q *Queries) CreateChunk(ctx context.Context, arg CreateChunkParams) (Chunk
 		arg.EndOffset,
 		arg.Content,
 		arg.Context,
+		arg.IndexingID,
 	)
 	var i Chunk
 	err := row.Scan(
@@ -42,31 +52,45 @@ func (q *Queries) CreateChunk(ctx context.Context, arg CreateChunkParams) (Chunk
 		&i.EndOffset,
 		&i.Content,
 		&i.Context,
+		&i.IndexingID,
 	)
 	return i, err
 }
 
 const createConversation = `-- name: CreateConversation :one
-INSERT INTO conversations DEFAULT VALUES RETURNING id, created_at, updated_at
+INSERT INTO conversations (session_id) VALUES (?) RETURNING id, session_id, created_at, updated_at
 `
 
-func (q *Queries) CreateConversation(ctx context.Context) (Conversation, error) {
-	row := q.db.QueryRowContext(ctx, createConversation)
+func (q *Queries) CreateConversation(ctx context.Context, sessionID string) (Conversation, error) {
+	row := q.db.QueryRowContext(ctx, createConversation, sessionID)
 	var i Conversation
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
 const createDocument = `-- name: CreateDocument :one
-INSERT INTO documents (index_id, filePath, fileType, fileSize)
-VALUES (?, ?, ?, ?) RETURNING id, created_at, updated_at, index_id, filepath, filetype, filesize
+INSERT INTO
+    documents (
+        index_id,
+        filePath,
+        fileType,
+        fileSize,
+        fileSha256
+    )
+VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at, index_id, filepath, filetype, filesize, filesha256
 `
 
 type CreateDocumentParams struct {
-	IndexID  int64
-	Filepath string
-	Filetype string
-	Filesize int64
+	IndexID    int64
+	Filepath   string
+	Filetype   string
+	Filesize   int64
+	Filesha256 string
 }
 
 func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) (Document, error) {
@@ -75,6 +99,7 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 		arg.Filepath,
 		arg.Filetype,
 		arg.Filesize,
+		arg.Filesha256,
 	)
 	var i Document
 	err := row.Scan(
@@ -85,12 +110,14 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 		&i.Filepath,
 		&i.Filetype,
 		&i.Filesize,
+		&i.Filesha256,
 	)
 	return i, err
 }
 
 const createIndex = `-- name: CreateIndex :one
-INSERT INTO indexes (name, description, path)
+INSERT INTO
+    indexes (name, description, path)
 VALUES (?, ?, ?) RETURNING id, created_at, updated_at, name, description, path
 `
 
@@ -115,15 +142,23 @@ func (q *Queries) CreateIndex(ctx context.Context, arg CreateIndexParams) (Index
 }
 
 const createMessage = `-- name: CreateMessage :one
-INSERT INTO messages (conversation_id, ipv4_addr, user_agent, content)
-VALUES (?, ?, ?, ?) RETURNING id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content
+INSERT INTO
+    messages (
+        conversation_id,
+        ipv4_addr,
+        user_agent,
+        content,
+        role
+    )
+VALUES (?, ?, ?, ?, ?) RETURNING id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content, role
 `
 
 type CreateMessageParams struct {
-	ConversationID int64
-	Ipv4Addr       string
-	UserAgent      string
-	Content        sql.NullString
+	ConversationID string
+	Ipv4Addr       sql.NullString
+	UserAgent      sql.NullString
+	Content        string
+	Role           string
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error) {
@@ -132,6 +167,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		arg.Ipv4Addr,
 		arg.UserAgent,
 		arg.Content,
+		arg.Role,
 	)
 	var i Message
 	err := row.Scan(
@@ -142,6 +178,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		&i.Ipv4Addr,
 		&i.UserAgent,
 		&i.Content,
+		&i.Role,
 	)
 	return i, err
 }
@@ -193,9 +230,7 @@ func (q *Queries) DeleteMessage(ctx context.Context, id int64) error {
 
 const getChunk = `-- name: GetChunk :one
 
-SELECT id, created_at, updated_at, document_id, start_offset, end_offset, content, context
-FROM chunks
-WHERE id = ? LIMIT 1
+SELECT id, created_at, updated_at, document_id, start_offset, end_offset, content, context, indexing_id FROM chunks WHERE id = ? LIMIT 1
 `
 
 // ------
@@ -213,15 +248,51 @@ func (q *Queries) GetChunk(ctx context.Context, id int64) (Chunk, error) {
 		&i.EndOffset,
 		&i.Content,
 		&i.Context,
+		&i.IndexingID,
 	)
 	return i, err
 }
 
+const getChunksByDocumentID = `-- name: GetChunksByDocumentID :many
+SELECT id, created_at, updated_at, document_id, start_offset, end_offset, content, context, indexing_id FROM chunks WHERE document_id = ?
+`
+
+func (q *Queries) GetChunksByDocumentID(ctx context.Context, documentID int64) ([]Chunk, error) {
+	rows, err := q.db.QueryContext(ctx, getChunksByDocumentID, documentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Chunk
+	for rows.Next() {
+		var i Chunk
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DocumentID,
+			&i.StartOffset,
+			&i.EndOffset,
+			&i.Content,
+			&i.Context,
+			&i.IndexingID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getConversation = `-- name: GetConversation :one
 
-SELECT id, created_at, updated_at
-FROM conversations
-WHERE id = ? LIMIT 1
+SELECT id, session_id, created_at, updated_at FROM conversations WHERE id = ? LIMIT 1
 `
 
 // ------
@@ -230,15 +301,34 @@ WHERE id = ? LIMIT 1
 func (q *Queries) GetConversation(ctx context.Context, id int64) (Conversation, error) {
 	row := q.db.QueryRowContext(ctx, getConversation, id)
 	var i Conversation
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getConversationBySessionID = `-- name: GetConversationBySessionID :one
+SELECT id, session_id, created_at, updated_at FROM conversations WHERE session_id = ? LIMIT 1
+`
+
+func (q *Queries) GetConversationBySessionID(ctx context.Context, sessionID string) (Conversation, error) {
+	row := q.db.QueryRowContext(ctx, getConversationBySessionID, sessionID)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
 const getDocument = `-- name: GetDocument :one
 
-SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize
-FROM documents
-WHERE id = ? LIMIT 1
+SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize, filesha256 FROM documents WHERE id = ? LIMIT 1
 `
 
 // ------
@@ -255,15 +345,34 @@ func (q *Queries) GetDocument(ctx context.Context, id int64) (Document, error) {
 		&i.Filepath,
 		&i.Filetype,
 		&i.Filesize,
+		&i.Filesha256,
+	)
+	return i, err
+}
+
+const getDocumentBySHA256 = `-- name: GetDocumentBySHA256 :one
+SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize, filesha256 FROM documents WHERE fileSha256 = ? LIMIT 1
+`
+
+func (q *Queries) GetDocumentBySHA256(ctx context.Context, filesha256 string) (Document, error) {
+	row := q.db.QueryRowContext(ctx, getDocumentBySHA256, filesha256)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IndexID,
+		&i.Filepath,
+		&i.Filetype,
+		&i.Filesize,
+		&i.Filesha256,
 	)
 	return i, err
 }
 
 const getIndex = `-- name: GetIndex :one
 
-SELECT id, created_at, updated_at, name, description, path
-FROM indexes
-WHERE id = ? LIMIT 1
+SELECT id, created_at, updated_at, name, description, path FROM indexes WHERE id = ? LIMIT 1
 `
 
 // ------
@@ -284,9 +393,7 @@ func (q *Queries) GetIndex(ctx context.Context, id int64) (Index, error) {
 }
 
 const getIndexByName = `-- name: GetIndexByName :one
-SELECT id, created_at, updated_at, name, description, path
-FROM indexes
-WHERE name = ? LIMIT 1
+SELECT id, created_at, updated_at, name, description, path FROM indexes WHERE name = ? LIMIT 1
 `
 
 func (q *Queries) GetIndexByName(ctx context.Context, name string) (Index, error) {
@@ -305,9 +412,7 @@ func (q *Queries) GetIndexByName(ctx context.Context, name string) (Index, error
 
 const getMessage = `-- name: GetMessage :one
 
-SELECT id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content
-FROM messages
-WHERE id = ? LIMIT 1
+SELECT id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content, role FROM messages WHERE id = ? LIMIT 1
 `
 
 // ------
@@ -324,14 +429,13 @@ func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
 		&i.Ipv4Addr,
 		&i.UserAgent,
 		&i.Content,
+		&i.Role,
 	)
 	return i, err
 }
 
 const listChunks = `-- name: ListChunks :many
-SELECT id, created_at, updated_at, document_id, start_offset, end_offset, content, context
-FROM chunks
-ORDER BY start_offset
+SELECT id, created_at, updated_at, document_id, start_offset, end_offset, content, context, indexing_id FROM chunks ORDER BY start_offset
 `
 
 func (q *Queries) ListChunks(ctx context.Context) ([]Chunk, error) {
@@ -352,6 +456,7 @@ func (q *Queries) ListChunks(ctx context.Context) ([]Chunk, error) {
 			&i.EndOffset,
 			&i.Content,
 			&i.Context,
+			&i.IndexingID,
 		); err != nil {
 			return nil, err
 		}
@@ -367,9 +472,7 @@ func (q *Queries) ListChunks(ctx context.Context) ([]Chunk, error) {
 }
 
 const listConversations = `-- name: ListConversations :many
-SELECT id, created_at, updated_at
-FROM conversations
-ORDER BY created_at
+SELECT id, session_id, created_at, updated_at FROM conversations ORDER BY created_at
 `
 
 func (q *Queries) ListConversations(ctx context.Context) ([]Conversation, error) {
@@ -381,7 +484,12 @@ func (q *Queries) ListConversations(ctx context.Context) ([]Conversation, error)
 	var items []Conversation
 	for rows.Next() {
 		var i Conversation
-		if err := rows.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.SessionID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -396,9 +504,7 @@ func (q *Queries) ListConversations(ctx context.Context) ([]Conversation, error)
 }
 
 const listDocuments = `-- name: ListDocuments :many
-SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize
-FROM documents
-ORDER BY created_at
+SELECT id, created_at, updated_at, index_id, filepath, filetype, filesize, filesha256 FROM documents ORDER BY created_at
 `
 
 func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
@@ -418,6 +524,7 @@ func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
 			&i.Filepath,
 			&i.Filetype,
 			&i.Filesize,
+			&i.Filesha256,
 		); err != nil {
 			return nil, err
 		}
@@ -433,9 +540,7 @@ func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
 }
 
 const listIndexes = `-- name: ListIndexes :many
-SELECT id, created_at, updated_at, name, description, path
-FROM indexes
-ORDER BY name
+SELECT id, created_at, updated_at, name, description, path FROM indexes ORDER BY name
 `
 
 func (q *Queries) ListIndexes(ctx context.Context) ([]Index, error) {
@@ -469,9 +574,7 @@ func (q *Queries) ListIndexes(ctx context.Context) ([]Index, error) {
 }
 
 const listMessages = `-- name: ListMessages :many
-SELECT id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content
-FROM messages
-ORDER BY created_at
+SELECT id, conversation_id, created_at, updated_at, ipv4_addr, user_agent, content, role FROM messages ORDER BY created_at
 `
 
 func (q *Queries) ListMessages(ctx context.Context) ([]Message, error) {
@@ -491,6 +594,7 @@ func (q *Queries) ListMessages(ctx context.Context) ([]Message, error) {
 			&i.Ipv4Addr,
 			&i.UserAgent,
 			&i.Content,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}
@@ -506,15 +610,23 @@ func (q *Queries) ListMessages(ctx context.Context) ([]Message, error) {
 }
 
 const updateChunk = `-- name: UpdateChunk :exec
-UPDATE chunks SET document_id = ?, start_offset = ?, end_offset = ?, content = ?, context = ? WHERE id = ?
+UPDATE chunks
+SET
+    document_id = ?,
+    start_offset = ?,
+    end_offset = ?,
+    content = ?,
+    context = ?
+WHERE
+    id = ?
 `
 
 type UpdateChunkParams struct {
 	DocumentID  int64
 	StartOffset sql.NullInt64
 	EndOffset   sql.NullInt64
-	Content     sql.NullString
-	Context     sql.NullString
+	Content     string
+	Context     string
 	ID          int64
 }
 
@@ -545,7 +657,13 @@ func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversation
 }
 
 const updateDocument = `-- name: UpdateDocument :exec
-UPDATE documents SET filePath = ?, fileType = ?, fileSize = ? WHERE id = ?
+UPDATE documents
+SET
+    filePath = ?,
+    fileType = ?,
+    fileSize = ?
+WHERE
+    id = ?
 `
 
 type UpdateDocumentParams struct {
@@ -581,14 +699,23 @@ func (q *Queries) UpdateIndex(ctx context.Context, arg UpdateIndexParams) error 
 }
 
 const updateMessage = `-- name: UpdateMessage :exec
-UPDATE messages SET conversation_id = ?, ipv4_addr = ?, user_agent = ?, content = ? WHERE id = ?
+UPDATE messages
+SET
+    conversation_id = ?,
+    ipv4_addr = ?,
+    user_agent = ?,
+    content = ?,
+    role = ?
+WHERE
+    id = ?
 `
 
 type UpdateMessageParams struct {
-	ConversationID int64
-	Ipv4Addr       string
-	UserAgent      string
-	Content        sql.NullString
+	ConversationID string
+	Ipv4Addr       sql.NullString
+	UserAgent      sql.NullString
+	Content        string
+	Role           string
 	ID             int64
 }
 
@@ -598,6 +725,7 @@ func (q *Queries) UpdateMessage(ctx context.Context, arg UpdateMessageParams) er
 		arg.Ipv4Addr,
 		arg.UserAgent,
 		arg.Content,
+		arg.Role,
 		arg.ID,
 	)
 	return err

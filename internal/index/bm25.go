@@ -1,8 +1,11 @@
 package index
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/OptimusePrime/petagpt/internal/parser"
 	"github.com/blevesearch/bleve/v2"
@@ -27,10 +30,19 @@ func CreateBleveIndex(indexPath string, defaultAnalyzer string) (bleve.Index, er
 	return index, nil
 }
 
+func DeleteBleveIndex(indexPath string) error {
+	err := os.RemoveAll(indexPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete Bleve index: %w", err)
+	}
+
+	return nil
+}
+
 func AddChunksToBleveIndex(indexPath string, docs ...parser.Chunk) error {
 	index, err := bleve.Open(indexPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open Bleve index: %w", err)
 	}
 
 	defer func() {
@@ -41,11 +53,32 @@ func AddChunksToBleveIndex(indexPath string, docs ...parser.Chunk) error {
 	for _, doc := range docs {
 		err = batch.Index(doc.SHA256(), doc)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add chunk to Bleve index: %w", err)
 		}
 	}
 	if err = index.Batch(batch); err != nil {
-		return err
+		return fmt.Errorf("failed to add chunks to Bleve index: %w", err)
+	}
+
+	return nil
+}
+
+func RemoveChunksFromBleveIndex(ctx context.Context, indexPath string, chunksIDs []string) error {
+	index, err := bleve.Open(indexPath)
+	if err != nil {
+		return fmt.Errorf("failed to open Bleve index: %w", err)
+	}
+
+	defer func() {
+		err = errors.Join(err, index.Close())
+	}()
+
+	batch := index.NewBatch()
+	for _, docID := range chunksIDs {
+		batch.Delete(docID)
+	}
+	if err = index.Batch(batch); err != nil {
+		return fmt.Errorf("failed to remove chunks from Bleve index: %w", err)
 	}
 
 	return nil
@@ -62,9 +95,9 @@ func SearchBleveIndex(indexPath string, queryString string, topN int) (*bleve.Se
 	}()
 
 	query := bleve.NewMatchQuery(queryString)
-	query.SetField("content")
-	searchRequest := bleve.NewSearchRequestOptions(query, max(topN, 100), 0, false)
-	searchRequest.Fields = []string{"title", "content"}
+
+	searchRequest := bleve.NewSearchRequestOptions(query, max(topN, 100), 0, true)
+	searchRequest.Fields = []string{"*"}
 	searchResult, err := index.Search(searchRequest)
 	if err != nil {
 		log.Fatal(err)

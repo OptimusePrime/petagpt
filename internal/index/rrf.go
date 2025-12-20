@@ -11,21 +11,26 @@ import (
 const RRF_K = 60
 
 func SearchIndex(ctx context.Context, indexName string, query string, topN int) (*SearchResult, error) {
+	//fmt.Println("Hello")
 	chromaResult, err := SearchChromaCollection(ctx, indexName, topN, query)
 	if err != nil {
 		return nil, err
 	}
+	//fmt.Println("Hello 2")
 
-	blevePath := filepath.Join(viper.GetString("data_dir"), "indexes", indexName+".bleve")
+	blevePath := filepath.Join(viper.GetString("data_dir"), "bm25", indexName+".bleve")
+	//fmt.Println(blevePath)
 	bm25Result, err := SearchBleveIndex(blevePath, query, topN)
 	if err != nil {
 		return nil, err
 	}
 
 	chromaGroup := chromaResult.GetDocumentsGroups()[0]
+	//fmt.Println(chromaGroup[0].ContentString())
 
 	chromaSearchResult := new(SearchResult)
 	bm25SearchResult := new(SearchResult)
+	//fmt.Println(bm25Result.Hits[0].Fields["Content"])
 
 	for i, doc := range chromaGroup {
 		chromaSearchResult.Documents = append(chromaSearchResult.Documents, SearchDocument{
@@ -40,9 +45,9 @@ func SearchIndex(ctx context.Context, indexName string, query string, topN int) 
 		bm25SearchResult.Documents = append(bm25SearchResult.Documents, SearchDocument{
 			Rank: i + 1,
 			Document: Document{
-				ID:      hit.ID,
-				Title:   hit.Fields["title"].(string),
-				Content: hit.Fields["content"].(string),
+				ID: hit.ID,
+				//Title:   hit.Fields["title"].(string),
+				Content: hit.Fields["Content"].(string),
 			},
 		})
 	}

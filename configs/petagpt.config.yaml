@@ -12,22 +12,20 @@ context_llm:
   temperature: 0.3
   top_p: 0.95
   max_concurrent_requests: 20
-  contextualize_prompt:
-    <document>
+  contextualize_prompt: <document>
     {{DOCUMENT}}
     </document>
-    
+
     <chunk>
     {{CHUNK}}
     </chunk>
-    
-    Please give a succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk for retrieval-augmented generation. 
+
+    Please give a succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk for retrieval-augmented generation.
     Answer only with the context and nothing else.
-  table_prompt:
-    <table>
+  table_prompt: <table>
     {{TABLE}}
     </table>
-    
+
     Transform the table into an article format with full sentences, as easy to understand as possible, for easy understanding by LLMs and embedding models. Make sure to preserve all meaning. It should be in the language of the table.
 embedding_service:
   base_url: "http://localhost:3000"
@@ -35,9 +33,21 @@ embedding_service:
   model: "Qwen3-Embedding-8B"
 chroma:
   base_url: "http://localhost:8001"
+safety_classifier:
+  base_url: "http://localhost:7050"
+  trigger_safety_level: "Conroversial"
+  trigger_safety_categories:
+    - Violent
+    - Non-violent Illegal Acts
+    - Sexual Content & Sexual Acts
+    - Suicide & Self-Harm
+    - Unethical Acts
+    - Jailbreak
+    - Politically Sensitive Topics
+    - Copyright Violation
+    - PII
 main_llm:
-  system_prompt:
-    Hi
+  system_prompt: Hi
   api_base: "https://api.openai.com/v1/"
   api_key: "<YOUR_API_KEY>"
   model: "gpt-5-mini"

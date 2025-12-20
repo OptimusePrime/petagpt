@@ -100,10 +100,10 @@ func InitConfig(cmd *cobra.Command) error {
 		}
 	}
 
-	err = viper.BindPFlags(cmd.Flags())
-	if err != nil {
-		return err
-	}
+	// err = viper.BindPFlags(cmd.Flags())
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

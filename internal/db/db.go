@@ -5,12 +5,11 @@ import (
 	"database/sql"
 	"path/filepath"
 
-	sqlc "github.com/OptimusePrime/petagpt/internal/sqlc"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/viper"
 )
 
-const SQLITE_VERSION = 0
+const SQLITE_VERSION = 2
 
 var MainDB *sql.DB
 
@@ -32,14 +31,14 @@ func InitDatabase(ctx context.Context) error {
 		return err
 	}
 
-	if dbVersion == SQLITE_VERSION {
+	if dbVersion >= SQLITE_VERSION {
 		return nil
 	}
 
-	_, err = MainDB.ExecContext(ctx, sqlc.DDL)
-	if err != nil {
-		return err
-	}
+	//_, err = MainDB.ExecContext(ctx, sqlc.DDL)
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
