@@ -45,22 +45,11 @@ func DeleteChromaCollection(ctx context.Context, name string) error {
 	defer func() {
 		err = errors.Join(err, client.Close())
 	}()
-
-	vllmEf, err := vllm.NewVLLMEmbeddingFunctionFromOptions(
-		vllm.WithModel(viper.GetString("embedding_service.model")),
-		vllm.WithBaseURL(viper.GetString("embedding_service.base_url")),
-		vllm.WithAPIKey(viper.GetString("embedding_service.api_key")),
-	)
 	if err != nil {
 		return fmt.Errorf("failed to create chroma client: %w", err)
 	}
 
-	collection, err := client.GetCollection(ctx, name, chroma.WithEmbeddingFunctionGet(vllmEf))
-	if err != nil {
-		return fmt.Errorf("failed to get chroma collection: %w", err)
-	}
-
-	err = collection.Delete(ctx)
+	err = client.DeleteCollection(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to delete chroma collection: %w", err)
 	}

@@ -58,7 +58,7 @@ func newDocumentRemoveCmd() *cobra.Command {
 				}
 
 				for _, chunk := range chunks {
-					chunkIDs = append(chunkIDs, chunk.IndexingID.String)
+					chunkIDs = append(chunkIDs, chunk.IndexingID)
 				}
 
 			}

@@ -2,7 +2,6 @@ package document
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -63,7 +62,7 @@ func newDocumentAddCmd() *cobra.Command {
 					return fmt.Errorf("failed getting file info: %s: %w", docPath, err)
 				}
 
-				chunks, err := parser.ProcessDocument(cmd.Context(), docData, filepath.Ext(docPath), dc, chunkSize, requestDelay)
+				chunks, err := parser.ProcessDocument(cmd.Context(), docData, filepath.Base(docPath), dc, chunkSize, requestDelay)
 				if err != nil {
 					return fmt.Errorf("failed chunking document: %s: %w", docPath, err)
 				}
@@ -92,18 +91,9 @@ func newDocumentAddCmd() *cobra.Command {
 				for _, c := range chunks {
 					_, err = queries.CreateChunk(cmd.Context(), sqlc.CreateChunkParams{
 						DocumentID: document.ID,
-						Content: sql.NullString{
-							String: c.Content,
-							Valid:  true,
-						},
-						Context: sql.NullString{
-							String: c.Context,
-							Valid:  true,
-						},
-						IndexingID: sql.NullString{
-							String: c.ID,
-							Valid:  true,
-						},
+						Content:    c.Content,
+						Context:    c.Context,
+						IndexingID: c.ID,
 					})
 					if err != nil {
 						return fmt.Errorf("failed creating chunk in database: %s: %w", docPath, err)

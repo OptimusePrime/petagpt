@@ -35,10 +35,10 @@ func InitDatabase(ctx context.Context) error {
 		return nil
 	}
 
-	//_, err = MainDB.ExecContext(ctx, sqlc.DDL)
-	//if err != nil {
-	//	return err
-	//}
+	/*	_, err = MainDB.ExecContext(ctx, sqlc.DDL)
+		if err != nil {
+			return err
+		}*/
 
 	return nil
 }

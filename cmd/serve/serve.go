@@ -45,7 +45,7 @@ var serveCmd = &cobra.Command{
 				}
 				fmt.Println(out.Sentences)*/
 
-		server.StartServer("vgim", 20)
+		server.StartServer("vgim1", 20)
 
 		return nil
 	},

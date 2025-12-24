@@ -12,6 +12,7 @@ var indexCmd = &cobra.Command{
 
 func NewCommand() *cobra.Command {
 	indexCmd.AddCommand(newIndexAddCommand())
+	indexCmd.AddCommand(newIndexRemoveCommand())
 
 	return indexCmd
 }

@@ -4,14 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/OptimusePrime/petagpt/internal/db"
 	"github.com/OptimusePrime/petagpt/internal/index"
 	"github.com/OptimusePrime/petagpt/internal/sqlc"
+	"github.com/charmbracelet/log"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/mattn/go-sqlite3"
 	"github.com/openai/openai-go/v2"
 	"github.com/openai/openai-go/v2/option"
 	"github.com/spf13/viper"
@@ -75,7 +78,7 @@ func handleCreateConversation(c *gin.Context, idxName string, topN int) {
 	queries := sqlc.New(db.MainDB)
 
 	_, err = queries.CreateConversation(context.Background(), req.SessionID)
-	if err != nil {
+	if err != nil && !errors.Is(err, sqlite3.ErrConstraintUnique) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("failed to create conversation: %s", err.Error()),
 		})
@@ -177,6 +180,22 @@ func handleSendConversationMessage(c *gin.Context, idxName string, topN int) {
 		},
 	}
 
+	var assistantMsg string
+
+	defer func() {
+		go func() {
+			_, err = queries.CreateMessage(context.Background(), sqlc.CreateMessageParams{
+				ConversationID: conversation.SessionID,
+				Role:           "assistant",
+				Content:        assistantMsg,
+			})
+
+			if err != nil {
+				log.Errorf("failed to save assistant message: conversation ID: %s: %s", conversation.SessionID, err.Error())
+			}
+		}()
+	}()
+
 	chatCompl, err := client.Chat.Completions.New(
 		ctx, params,
 	)
@@ -190,8 +209,9 @@ func handleSendConversationMessage(c *gin.Context, idxName string, topN int) {
 	//fmt.Println(chatCompl.Choices[0].RawJSON())
 	toolCalls := chatCompl.Choices[0].Message.ToolCalls
 	if len(toolCalls) == 0 {
+		assistantMsg = chatCompl.Choices[0].Message.Content
 		c.JSON(http.StatusOK, gin.H{
-			"response": chatCompl.Choices[0].Message.Content,
+			"response": assistantMsg,
 		})
 		return
 	}
@@ -231,14 +251,9 @@ func handleSendConversationMessage(c *gin.Context, idxName string, topN int) {
 		return
 	}
 
-	assistantMsg := chatCompl.Choices[0].Message.Content
-	queries.CreateMessage(context.Background(), sqlc.CreateMessageParams{
-		ConversationID: conversation.SessionID,
-		Content:        assistantMsg,
-		Role:           "assistant",
-	})
+	assistantMsg = chatCompl.Choices[0].Message.Content
 
 	c.JSON(http.StatusOK, gin.H{
-		"response": chatCompl.Choices[0].Message.Content,
+		"response": assistantMsg,
 	})
 }

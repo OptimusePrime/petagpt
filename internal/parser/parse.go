@@ -83,6 +83,7 @@ func uploadDocumentLlamaIndex(ctx context.Context, document []byte, fileName str
 		"page_separator":                        PARSING_PAGE_SEPARATOR,
 		"output_tables_as_HTML":                 "true",
 		"merge_tables_across_pages_in_markdown": "true",
+		"tier":                                  "agentic",
 	}
 
 	for field, value := range fields {
